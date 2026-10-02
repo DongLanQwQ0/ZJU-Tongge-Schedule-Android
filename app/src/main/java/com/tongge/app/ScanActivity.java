@@ -14,9 +14,7 @@ public final class ScanActivity extends CaptureActivity {
         getWindow().setNavigationBarColor(Color.BLACK);
         if (android.os.Build.VERSION.SDK_INT >= 30) {
             getWindow().setDecorFitsSystemWindows(false);
-            getWindow().getInsetsController().setSystemBarsAppearance(0,
-                android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
-                    | android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
+            applySystemBars();
         } else getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE
             | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
         View content = findViewById(android.R.id.content);
@@ -33,5 +31,20 @@ public final class ScanActivity extends CaptureActivity {
             return insets.consumeSystemWindowInsets();
         });
         content.post(content::requestApplyInsets);
+    }
+
+    private void applySystemBars() {
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            // The controller may not exist until the scanner window is attached.
+            android.view.WindowInsetsController controller = getWindow().getInsetsController();
+            if (controller != null) controller.setSystemBarsAppearance(0,
+                android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                    | android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
+        }
+    }
+
+    @Override public void onWindowFocusChanged(boolean focused) {
+        super.onWindowFocusChanged(focused);
+        if (focused) applySystemBars();
     }
 }

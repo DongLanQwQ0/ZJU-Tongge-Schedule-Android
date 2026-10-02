@@ -12,12 +12,46 @@
         if (manual) manual.hidden = true;
     }
     followSystem();
+    var apkDownload = document.getElementById('btn-android-download');
+    if (apkDownload) apkDownload.hidden = true;
     if (!window.__tonggeThemeObserver) {
         window.__tonggeThemeObserver = new MutationObserver(followSystem);
         window.__tonggeThemeObserver.observe(document.documentElement,
             { attributes: true, attributeFilter: ['data-theme'] });
     }
     var menu = document.getElementById('more-menu');
+    function serverLink(id, className) {
+        var link = document.createElement('a');
+        link.id = id;
+        link.className = className;
+        link.href = 'tongge://server';
+        link.textContent = '服务器设置';
+        return link;
+    }
+    if (menu && !document.getElementById('android-server')) {
+        var server = serverLink('android-server', 'menu-item');
+        server.innerHTML = '<span class="menu-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="8" rx="2"/><rect x="2" y="13" width="20" height="8" rx="2"/><path d="M6 7h.01M6 17h.01"/></svg></span>服务器设置';
+        menu.insertBefore(server, document.getElementById('btn-logout'));
+    }
+    var auth = document.getElementById('screen-auth');
+    if (auth && !document.getElementById('android-auth-actions')) {
+        var row = document.createElement('div');
+        row.id = 'android-auth-actions';
+        row.style.cssText = 'display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:18px';
+        var offline = document.createElement('button');
+        offline.type = 'button';
+        offline.className = 'btn ghost small';
+        offline.textContent = '本地快速比对';
+        offline.addEventListener('click', function () { document.getElementById('btn-local').click(); });
+        row.appendChild(offline);
+        var authScan = document.createElement('a');
+        authScan.className = 'btn ghost small';
+        authScan.href = 'tongge://scan';
+        authScan.textContent = '扫一扫';
+        row.appendChild(authScan);
+        row.appendChild(serverLink('android-auth-server', 'btn ghost small'));
+        auth.appendChild(row);
+    }
     if (menu && !document.getElementById('android-updates')) {
         var update = document.createElement('a');
         update.id = 'android-updates';

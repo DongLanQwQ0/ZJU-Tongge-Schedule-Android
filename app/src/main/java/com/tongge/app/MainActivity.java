@@ -1,6 +1,7 @@
 package com.tongge.app;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.DownloadManager;
 import android.content.Intent;
 import android.content.res.Configuration;
@@ -16,11 +17,14 @@ import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 import android.widget.FrameLayout;
+import android.widget.EditText;
+import android.text.InputType;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
@@ -30,7 +34,8 @@ import java.nio.charset.StandardCharsets;
 import java.io.OutputStream;
 
 public final class MainActivity extends Activity {
-    private static final String HOME = "https://111.228.3.50/tongge/";
+    private String serverBase;
+    private EmbeddedWebsite website;
     private static final int PICK_FILE = 1, SAVE_FILE = 2;
     private static final int CAMERA_PERMISSION = 3;
     private WebView web;
@@ -46,6 +51,8 @@ public final class MainActivity extends Activity {
         setTheme(isDarkTheme() ? android.R.style.Theme_Material_NoActionBar
             : android.R.style.Theme_Material_Light_NoActionBar);
         super.onCreate(state);
+        serverBase = getSharedPreferences("server", MODE_PRIVATE).getString("base", ServerAddress.DEFAULT);
+        website = new EmbeddedWebsite(this, serverBase);
         updates = new ReleaseUpdates(this);
         try (java.io.InputStream stream = getAssets().open("android-web.js")) {
             java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
@@ -91,6 +98,9 @@ public final class MainActivity extends Activity {
         if (android.os.Build.VERSION.SDK_INT >= 33) settings.setAlgorithmicDarkeningAllowed(false);
         CookieManager.getInstance().setAcceptCookie(true);
         web.setWebViewClient(new WebViewClient() {
+            @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                return website.intercept(request);
+            }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 if ("tongge".equals(uri.getScheme()) && "scan".equals(uri.getHost())) {
@@ -100,6 +110,11 @@ public final class MainActivity extends Activity {
                 if ("tongge".equals(uri.getScheme()) && "updates".equals(uri.getHost())) {
                     if (request.isForMainFrame() && view.getUrl() != null && isTrustedSite(Uri.parse(view.getUrl())))
                         updates.check(true);
+                    return true;
+                }
+                if ("tongge".equals(uri.getScheme()) && "server".equals(uri.getHost())) {
+                    if (request.isForMainFrame() && view.getUrl() != null && isTrustedSite(Uri.parse(view.getUrl())))
+                        showServerSettings();
                     return true;
                 }
                 if (isTrustedSite(uri)) return false;
@@ -113,7 +128,9 @@ public final class MainActivity extends Activity {
         });
         web.setWebChromeClient(new WebChromeClient() {
             @Override public void onPermissionRequest(PermissionRequest request) {
-                if (!isTrustedSite(request.getOrigin()) || !java.util.Arrays.asList(request.getResources())
+                if (!ServerAddress.sameOrigin(serverBase, request.getOrigin().toString())
+                        || web.getUrl() == null || !isTrustedSite(Uri.parse(web.getUrl()))
+                        || !java.util.Arrays.asList(request.getResources())
                         .contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) { request.deny(); return; }
                 if (checkSelfPermission(android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
                     request.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
@@ -154,7 +171,13 @@ public final class MainActivity extends Activity {
                 toast("已开始下载");
             } catch (Exception e) { toast("下载失败"); }
         });
-        if (state == null) web.loadUrl(HOME); else web.restoreState(state);
+        if (state == null || !serverBase.equals(state.getString("serverBase"))) {
+            web.loadUrl(ServerAddress.localHome(serverBase));
+        } else {
+            web.restoreState(state);
+            if (web.getUrl() == null || !isTrustedSite(Uri.parse(web.getUrl())))
+                web.loadUrl(ServerAddress.localHome(serverBase));
+        }
         if (android.os.Build.VERSION.SDK_INT >= 33) {
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
                 android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,
@@ -163,9 +186,36 @@ public final class MainActivity extends Activity {
         root.postDelayed(() -> updates.check(false), 800);
     }
 
-    private static boolean isTrustedSite(Uri uri) {
-        return "https".equals(uri.getScheme()) && "111.228.3.50".equals(uri.getHost())
-            && (uri.getPort() == -1 || uri.getPort() == 443);
+    private boolean isTrustedSite(Uri uri) {
+        return ServerAddress.sameOrigin(serverBase, uri.toString())
+            && (ServerAddress.LOCAL_PATH + "index.html").equals(uri.getPath());
+    }
+
+    private void showServerSettings() {
+        EditText address = new EditText(this);
+        address.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        address.setText(serverBase);
+        address.setSingleLine(false);
+        int margin = (int) (24 * getResources().getDisplayMetrics().density);
+        FrameLayout container = new FrameLayout(this);
+        container.setPadding(margin, 0, margin, 0);
+        container.addView(address, new FrameLayout.LayoutParams(-1, -2));
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("服务器设置")
+            .setMessage("填写完整 HTTPS 地址，包含部署路径。更换后需重新登录。")
+            .setView(container).setNegativeButton("取消", null).setPositiveButton("保存", null).create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+            final String next;
+            try { next = ServerAddress.normalize(address.getText().toString()); }
+            catch (IllegalArgumentException e) { address.setError(e.getMessage()); return; }
+            if (next.equals(serverBase)) { dialog.dismiss(); return; }
+            // Clear the old deployment's login before changing either host or base path.
+            web.evaluateJavascript("if(window.API)API.setToken('');", result -> {
+                getSharedPreferences("server", MODE_PRIVATE).edit().putString("base", next).apply();
+                dialog.dismiss();
+                recreate();
+            });
+        }));
+        dialog.show();
     }
     @Override protected void onResume() {
         super.onResume();
@@ -243,7 +293,8 @@ public final class MainActivity extends Activity {
         String code = text.trim();
         if (!code.matches("[0-9]{6}|[0-9]{8}")) {
             Uri uri = Uri.parse(code);
-            if (!isTrustedSite(uri) || !"/tongge/".equals(uri.getPath())) {
+            if (!ServerAddress.sameOrigin(serverBase, uri.toString())
+                    || !Uri.parse(serverBase).getPath().equals(uri.getPath())) {
                 toast("请扫描同格群组二维码"); return;
             }
             code = uri.getQueryParameter("code");
@@ -251,7 +302,7 @@ public final class MainActivity extends Activity {
         if (code == null || !code.matches("[0-9]{6}|[0-9]{8}")) {
             toast("二维码中没有有效邀请码"); return;
         }
-        web.loadUrl(HOME + "?code=" + Uri.encode(code));
+        web.loadUrl(ServerAddress.localHome(serverBase) + "?code=" + Uri.encode(code));
     }
 
     private void saveData(String url, String name) {
@@ -297,7 +348,11 @@ public final class MainActivity extends Activity {
         }
     }
     private void toast(String message) { Toast.makeText(this, message, Toast.LENGTH_SHORT).show(); }
-    @Override protected void onSaveInstanceState(Bundle state) { super.onSaveInstanceState(state); web.saveState(state); }
+    @Override protected void onSaveInstanceState(Bundle state) {
+        super.onSaveInstanceState(state);
+        state.putString("serverBase", serverBase);
+        web.saveState(state);
+    }
     // API 33+ uses the native OnBackInvokedDispatcher registered in onCreate;
     // this callback remains exclusively for Android 26-32.
     @android.annotation.SuppressLint("GestureBackNavigation")

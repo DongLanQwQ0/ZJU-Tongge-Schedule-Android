@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f2f2f7">
+<title>同格 · 与一个或一群有趣的人同行｜浙大课表撞课</title>
+
+<!-- 搜索与分享用的语义信息。
+     标题和描述里特意带上「浙大 / 浙江大学」——这是同学实际会搜的词；
+     og:* 是往 QQ / 微信群里贴链接时那张小卡片的内容。 -->
+<meta name="description" content="浙江大学的课表撞课工具：上传 .ics 课表、建个群、扫码入群，一眼看出和同学哪几节课在一起、教室离得多近。课表在浏览器本地解析，不上传原始文件。">
+<meta name="keywords" content="浙大,浙江大学,ZJU,课表,撞课,课程表,找课搭子,课友,ics,同格">
+<meta name="author" content="DongLanQwQ">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="同格">
+<meta property="og:title" content="同格 · 与一个或一群有趣的人同行">
+<meta property="og:description" content="传上课表、建个群，一眼看出你和同学哪几节课在一起、教室离得多近。">
+<meta property="og:image" content="img/mascot/pig-pair.gif">
+<meta name="twitter:card" content="summary">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "同格",
+  "alternateName": "浙大课表撞课比对",
+  "applicationCategory": "UtilitiesApplication",
+  "operatingSystem": "Web",
+  "inLanguage": "zh-CN",
+  "description": "上传 .ics 课表、建个群、扫码入群，一眼看出和同学哪几节课在一起、教室离得多近。",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+  "author": { "@type": "Person", "name": "DongLanQwQ" }
+}
+</script>
+<script>
+/* 首屏绘制前定好主题，免得先闪一帧白的。
+   没手动选过就跟随系统；选了就听用户的。 */
+(function () {
+    var t = null;
+    try { t = localStorage.getItem('dsh_theme'); } catch (e) { /* 隐私模式下读不到，忽略 */ }
+    if (t !== 'light' && t !== 'dark') {
+        t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- 装饰背景：一张夜景照片（光球与尖塔）。只在深色主题显示，见 style.css 的 .bg-photo。
+     单独一层固定元素，不吃点击、不参与布局；关掉它（换主题）时页面布局一点都不动。 -->
+<div class="bg-photo" aria-hidden="true"></div>
+
+<!-- 图标系统：Lucide（24×24 线性、2px 描边、圆头圆角）。
+     路径只在这里存一份，静态标记与 app.js 动态渲染都引用同一个 #i-*。
+     内联而不是引 CDN 或图标字体：站点保持「拖下来就能跑」，也不会有字形闪烁。
+     新增图标：往下面加一条 <symbol>，名字与 lucide.dev 上的图标名一致。 -->
+<svg class="sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-chevron-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18l-6-6l6-6"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18l6-6l-6-6"/></symbol>
+    <symbol id="i-ellipsis" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.12 2.12 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.12 2.12 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.12 2.12 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.12 2.12 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.12 2.12 0 0 0 1.597-1.16z"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+    <symbol id="i-wrench" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"/></symbol>
+    <symbol id="i-log-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 17l5-5l-5-5m5 5H9m0 9H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></symbol>
+    <symbol id="i-graduation-cap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0zM22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-7-7v14"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+    <symbol id="i-ticket-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Zm7 3h6m-3-3v6"/></symbol>
+    <symbol id="i-ticket-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Zm7.5 5.5l5-5m-5 0l5 5"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594zM20 2v4m2-2h-4"/><circle cx="4" cy="20" r="2"/></symbol>
+    <symbol id="i-flask-conical" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2M6.453 15h11.094M8.5 2h7"/></symbol>
+    <symbol id="i-server" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><path d="M6 6h.01M6 18h.01"/></symbol>
+    <symbol id="i-arrow-down-wide-narrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16l4 4l4-4m-4 4V4m4 0h10M11 8h7m-7 4h4"/></symbol>
+    <symbol id="i-arrow-up-narrow-wide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8l4-4l4 4M7 4v16m4-8h4m-4 4h7m-7 4h10"/></symbol>
+    <symbol id="i-arrow-left-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3L4 7l4 4M4 7h16m-4 14l4-4l-4-4m4 4H4"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></symbol>
+</svg>
+
+<header class="topbar" id="topbar" hidden>
+    <!-- 左上角：返回键在最左（子页面才出现），求 Star 紧挨着它右边 —— 这样展开/收起
+         时返回键不会被推着走。展开 / 收起由 app.js 的 revealStar() 控制，
+         样式见 style.css 的 .star-btn -->
+    <button class="icon-btn" id="btn-back" hidden title="返回" aria-label="返回"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-chevron-left"></use></svg></button>
+    <a class="icon-btn star-btn" id="btn-star" href="https://github.com/DongLanQwQ0/ZJU-Tongge-Schedule" target="_blank" rel="noopener noreferrer" title="去 GitHub 点个 Star"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-star"></use></svg><span class="star-text">求个 Star</span></a>
+    <h1 id="topbar-title">同格</h1>
+    <span class="who" id="topbar-who"></span>
+    <!-- 「管理 / 主题 / 退出」原来是三颗并排的小圆点，手机上又挤又容易点错，
+         现在收进一个「更多」菜单：点这颗按钮展开，选完一项 / 点别处 / 按 Esc 都收起 -->
+    <button class="icon-btn" id="btn-more" title="更多" aria-label="更多" aria-haspopup="true" aria-expanded="false"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-ellipsis"></use></svg></button>
+    <div class="more-menu" id="more-menu" hidden>
+        <button class="menu-item" id="btn-account"><span class="menu-ico"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-user"></use></svg></span>账号</button>
+        <button class="menu-item" id="btn-share"><span class="menu-ico"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-link"></use></svg></span>分享给同学</button>
+        <button class="menu-item" id="btn-theme"><span class="menu-ico" id="theme-icon"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-moon"></use></svg></span>切换深色 / 浅色</button>
+        <button class="menu-item" id="btn-admin" hidden><span class="menu-ico"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-wrench"></use></svg></span>管理</button>
+        <!-- 退出不加 .danger：它是可逆的（重新登录就回来），红色留给不可逆的注销。
+             注销也搬出了这个菜单 —— 见 screen-account -->
+        <button class="menu-item" id="btn-logout"><span class="menu-ico"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-log-out"></use></svg></span>退出登录</button>
+    </div>
+</header>
+
+<main>
+
+<!-- ==================================================== 登录 / 注册 -->
+<section class="screen" id="screen-auth">
+    <div class="auth-hero">
+        <!-- 一枚方角渐变徽标：把「同格」两个字前面的位置留给图形，
+             比裸放一个 46px 的表情稳，深浅两套主题都不用单独调 -->
+        <div class="auth-mark" aria-hidden="true"><svg class="ico" focusable="false"><use href="#i-graduation-cap"></use></svg></div>
+        <div class="auth-brand">同格</div>
+        <h1 class="auth-tagline">与一个或一群有趣的人同行</h1>
+    </div>
+
+    <div class="card">
+        <!-- 包在 form 里：密码框不在 form 内浏览器认不出这是登录表单
+             （密码管理器不工作，Chrome 还会控制台警告），顺带白拿一个回车提交 -->
+        <form id="auth-form" novalidate>
+            <div class="segmented" id="auth-tabs">
+                <button type="button" data-mode="login" class="on">登录</button>
+                <button type="button" data-mode="register">注册</button>
+            </div>
+
+            <div class="onboard" id="auth-tip" hidden>
+                <b>这不是注册什么账号</b> —— 只是起个名字，
+                让同学知道这份课表是谁的。不用邮箱，也不用手机号。
+            </div>
+
+            <label class="field">
+                <span>昵称</span>
+                <input class="input" id="auth-nickname" name="username" maxlength="10" placeholder="群里显示的名字" autocomplete="username">
+            </label>
+            <label class="field">
+                <span>密码</span>
+                <input class="input" id="auth-password" name="password" type="password" placeholder="自己设一个，至少 6 位" autocomplete="current-password">
+            </label>
+            <label class="field" id="auth-confirm-field" hidden>
+                <span>确认密码</span>
+                <input class="input" id="auth-confirm" name="confirm" type="password" placeholder="再输一次" autocomplete="new-password">
+            </label>
+            <label class="field" id="auth-captcha-field" hidden>
+                <span id="auth-captcha-label">验证码 · 算一算图里的式子</span>
+                <div class="captcha-row">
+                    <img class="captcha-img" id="auth-captcha-img" alt="算术验证码" title="点一下换一题">
+                    <input class="input" id="auth-captcha" name="captcha" inputmode="numeric" maxlength="2" placeholder="等于几" autocomplete="off">
+                </div>
+            </label>
+
+            <p class="form-err" id="auth-error" hidden></p>
+
+            <button class="btn" id="auth-submit" type="submit">登录</button>
+        </form>
+    </div>
+
+    <!-- 功能说明放这儿：不跟上面那句初衷抢位置，顺带给搜索引擎一点可读的正文 -->
+    <p class="auth-note">传上课表、建个群，就能看到你和同学哪几节课在一起、教室离得多近</p>
+</section>
+
+<!-- ==================================================== 首页 -->
+<section class="screen" id="screen-home">
+    <div class="card">
+        <h2>搜索群成员</h2>
+        <input class="input" id="cross-member-search" placeholder="搜索昵称、备注或首字母（仅限我加入的群）">
+        <div class="list" id="cross-member-results" hidden></div>
+    </div>
+    <div class="card" id="home-recent-card" hidden>
+        <h2>最近常看</h2>
+        <div class="recent-strip" id="home-recent"></div>
+    </div>
+    <div class="card">
+        <div class="home-groups-head">
+            <h2>我的群组</h2>
+            <div class="home-groups-actions">
+                <button class="btn ghost small" id="btn-create-group" type="button">+ 创建</button>
+                <button class="btn small" id="btn-join-group" type="button">加入</button>
+            </div>
+        </div>
+        <div class="list" id="home-groups"><div class="empty">还没有加入任何群组</div></div>
+    </div>
+
+    <div class="card">
+        <h2>我的课表 <span class="sub" id="home-course-status">未上传</span></h2>
+        <label class="drop" id="home-drop">
+            <div id="home-drop-text">点击选择 .ics / .txt 课表文件</div>
+            <span class="badge" id="home-badge">未上传</span>
+            <input type="file" accept=".ics,.txt" id="home-file">
+        </label>
+        <p class="tiny" style="margin-top:8px">
+            课表用于与其他成员比对。
+        </p>
+        <button class="link-btn center js-ics-help" id="btn-ics-help">第一次用？看看怎么导出 .ics</button>
+    </div>
+
+    <div class="card">
+        <h2>本地快速比对 <span class="sub">不上传服务器</span></h2>
+        <p class="tiny" style="margin-bottom:10px">选两份课表直接比对。</p>
+        <div class="local-entry-actions">
+            <button class="btn ghost" id="btn-local">打开本地比对</button>
+            <button class="btn btn-ico" id="btn-android-download" type="button"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-download"></use></svg>下载 APK</button>
+        </div>
+    </div>
+
+    <div class="card" id="admin-entry-card" hidden>
+        <h2>管理 <span class="sub">仅超级用户可见</span></h2>
+        <p class="tiny" style="margin-bottom:10px">全部账号、群组与审计日志。</p>
+        <button class="btn ghost" id="btn-open-admin">打开管理页</button>
+    </div>
+</section>
+
+<!-- ==================================================== 管理页 -->
+<section class="screen" id="screen-admin">
+    <div class="card">
+        <h2>概览 <span class="sub" id="admin-me"></span></h2>
+        <div class="stats" id="admin-stats"></div>
+        <!-- 统计是「观察」，管理页是「操作台」（筛账号、删号、解散群）—— 使用节奏不一样，
+             所以单开一屏。入口放这儿：反正只有管理员进得来 -->
+        <button class="btn ghost small btn-ico" id="btn-admin-stats" style="margin-top:12px">看活跃度统计<svg class="ico" aria-hidden="true" focusable="false"><use href="#i-chevron-right"></use></svg></button>
+    </div>
+
+    <div class="card">
+        <h2>账号 <span class="sub" id="admin-user-count"></span></h2>
+        <input class="input" id="admin-user-filter" placeholder="按昵称或 IP 筛一下">
+
+        <div class="segmented wrap" id="admin-status">
+            <button data-status="all" class="on">全部</button>
+            <button data-status="admin">管理员</button>
+            <button data-status="suspect">待复核</button>
+            <button data-status="dormant">待清理</button>
+            <button data-status="nocourse">未传课表</button>
+            <button data-status="hascourse">已传课表</button>
+        </div>
+
+        <div class="filter-row">
+            <select class="input" id="admin-sort" aria-label="排序方式">
+                <option value="regAt">按注册时间</option>
+                <option value="lastLoginAt">按最后登录</option>
+                <option value="loginCount">按登录次数</option>
+                <option value="courseCount">按课表时段</option>
+                <option value="idleDays">按没露面天数</option>
+                <option value="nickname">按昵称</option>
+            </select>
+            <button class="btn ghost small btn-ico" id="admin-sort-dir"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-arrow-down-wide-narrow"></use></svg><span>降序</span></button>
+            <button class="btn ghost small" id="admin-more-toggle">更多筛选</button>
+        </div>
+
+        <div class="more-filters" id="admin-more" hidden>
+            <div class="frow">
+                <span class="flabel">注册时间</span>
+                <input class="input" type="date" id="admin-reg-from" aria-label="注册起始日期">
+                <span class="tilde">~</span>
+                <input class="input" type="date" id="admin-reg-to" aria-label="注册结束日期">
+            </div>
+            <div class="frow">
+                <span class="flabel">最近露面</span>
+                <span class="ftext">至少</span>
+                <input class="input" type="number" min="0" id="admin-idle-min" placeholder="不限" aria-label="至少多少天没露面">
+                <span class="ftext">天没来</span>
+            </div>
+            <div class="frow">
+                <span class="flabel">登录次数</span>
+                <input class="input" type="number" min="0" id="admin-login-min" placeholder="不限" aria-label="登录次数下限">
+                <span class="tilde">~</span>
+                <input class="input" type="number" min="0" id="admin-login-max" placeholder="不限" aria-label="登录次数上限">
+            </div>
+            <div class="frow">
+                <span class="flabel">课表时段</span>
+                <input class="input" type="number" min="0" id="admin-course-min" placeholder="不限" aria-label="课表时段下限">
+                <span class="tilde">~</span>
+                <input class="input" type="number" min="0" id="admin-course-max" placeholder="不限" aria-label="课表时段上限">
+            </div>
+            <button class="btn ghost small" id="admin-filter-reset">清空筛选</button>
+        </div>
+
+        <div class="list" id="admin-users" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card">
+        <h2>群组 <span class="sub" id="admin-group-count"></span></h2>
+        <div class="list" id="admin-groups"></div>
+    </div>
+
+    <div class="card" id="admin-dormant-card" hidden>
+        <h2>待清理 <span class="sub" id="admin-dormant-count"></span></h2>
+        <p class="tiny" style="margin-bottom:10px">
+            没传过课表、而且 30 天没露过面的账号。列出来供你判断，不会自动删。
+        </p>
+        <div class="list" id="admin-dormant"></div>
+    </div>
+
+    <div class="card" id="admin-suspect-card" hidden>
+        <h2>异常注册 <span class="sub" id="admin-suspect-count"></span></h2>
+        <p class="tiny" style="margin-bottom:10px">同一 IP 短时间内冒出一堆账号，整簇都会被标出来。</p>
+        <div class="list" id="admin-suspects"></div>
+    </div>
+
+    <div class="card">
+        <h2>审计日志 <span class="sub">最近 200 条，新的在上</span></h2>
+        <div class="list" id="admin-audit"></div>
+    </div>
+</section>
+
+<!-- ==================================================== 统计 -->
+<section class="screen" id="screen-stats">
+    <div class="card">
+        <h2>活跃度 <span class="sub" id="stats-window"></span></h2>
+        <!-- 7 / 30 / 90 是服务端的白名单，别在这儿加别的档位 -->
+        <div class="segmented" id="stats-range">
+            <button data-days="7">7 天</button>
+            <button data-days="30" class="on">30 天</button>
+            <button data-days="90">90 天</button>
+        </div>
+        <div class="stats" id="stats-today" style="margin-top:12px"></div>
+        <p class="stat-note tiny" id="stats-retention"></p>
+    </div>
+
+    <div class="card">
+        <h2>曲线 <span class="sub">按天，画的是形状不是绝对值</span></h2>
+        <div class="spark-wrap">
+            <div class="spark" id="stats-active-spark"></div>
+            <div class="tiny">每天活跃人数（窗口内最高的一天顶到上沿）</div>
+        </div>
+        <div class="spark-wrap" style="margin-top:16px">
+            <div class="spark new" id="stats-new-spark"></div>
+            <div class="tiny">每天新增账号</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>动作 <span class="sub" id="stats-actions-sub"></span></h2>
+        <div class="list" id="stats-actions"></div>
+    </div>
+
+    <div class="card">
+        <h2>用户计量 <span class="sub" id="stats-top-sub"></span></h2>
+        <p class="stat-note tiny" id="stats-courses"></p>
+        <div class="list" id="stats-top"></div>
+    </div>
+</section>
+
+<!-- ==================================================== 群组页 -->
+<section class="screen" id="screen-group">
+    <div class="card invite" id="group-invite-card">
+        <div id="invite-share-box">
+            <div class="tiny">把邀请码或二维码发给同学</div>
+            <div class="code" id="group-code">······</div>
+            <div class="qr" id="group-qr"></div>
+            <div class="tiny" id="group-url" style="margin-top:10px;word-break:break-all"></div>
+            <div class="row" style="margin-top:12px">
+                <button class="btn secondary small" id="btn-copy-code" style="flex:1">复制邀请码</button>
+                <button class="btn secondary small" id="btn-copy-link" style="flex:1">复制链接</button>
+                <button class="btn secondary small" id="btn-zoom-qr" style="flex:1">放大二维码</button>
+            </div>
+
+            <!-- 这里显示的码是谁的、什么时候过期，都在这一行讲清楚 -->
+            <p class="tiny" id="group-current-note" style="margin-top:10px"></p>
+        </div>
+
+        <!-- 群主关掉「成员分享」之后，成员这边换上这一块（卡片留着，只换内容） -->
+        <div class="invite-note" id="invite-closed" hidden>
+            <div class="note-mark" aria-hidden="true"><svg class="ico" focusable="false"><use href="#i-lock"></use></svg></div>
+            <p>群主关掉了「成员分享」<br>
+                想让同学进来？用群主发出来的那条链接，或者直接找他要一条 ——<br>
+                他那边随时能生成。你负责把人喊来，码的事交给群主 (๑•̀ㅂ•́)و✧</p>
+        </div>
+
+        <!-- 一枚能用的票都没有（群主全收回去了）。文案由 app.js 按「你是群主吗」分两套：
+             群主看到的是出口（当场生成一条），成员看到的是「找群主要一条」。
+             这张卡片绝不能是个死胡同 —— 那正是这次要修的毛病 -->
+        <div class="invite-note" id="invite-empty" hidden>
+            <div class="note-mark" id="invite-empty-icon" aria-hidden="true"><svg class="ico" focusable="false"><use href="#i-ticket-x"></use></svg></div>
+            <p id="invite-empty-text"></p>
+            <button class="btn small" id="btn-invite-create" hidden>生成一条邀请链接</button>
+        </div>
+
+        <!-- 多个链接的管理搬到独立页面，这里只留一个入口 -->
+        <button class="link-btn center" id="btn-manage-invites" style="margin-top:6px" hidden>
+            管理邀请链接
+        </button>
+    </div>
+
+    <div class="card">
+        <h2 id="group-name">群组<button class="link-btn inline" id="btn-rename-group" hidden>改名</button><button class="link-btn inline" id="btn-transfer-group" hidden>转让</button></h2>
+        <p class="tiny" id="group-expiry" hidden></p>
+        <p class="tiny" style="margin-bottom:8px">各人与你在该周的重合课时数</p>
+        <div class="weeks" id="group-weeks"></div>
+        <p class="tiny week-note">调休补课、考试等日期照常显示。</p>
+        <div class="notice" id="group-notice" hidden></div>
+        <div id="group-members"><div class="list member-result-list"><div class="spinner">加载中…</div></div></div>
+    </div>
+
+    <div class="card" id="group-requests-card" hidden>
+        <h2>想进群的人 <span class="sub" id="group-requests-count"></span></h2>
+        <div class="list" id="group-requests"></div>
+    </div>
+
+    <div class="card" id="group-settings-card" hidden>
+        <h2>群组设置</h2>
+        <label class="field">
+            <span>谁能进群</span>
+            <div class="segmented" id="join-mode">
+                <button data-mode="open" class="on">拿到链接就能进</button>
+                <button data-mode="approval">要我同意</button>
+            </div>
+        </label>
+        <label class="field">
+            <span>谁能分享邀请</span>
+            <div class="segmented" id="share-mode">
+                <button data-share="all" class="on">成员也能分享</button>
+                <button data-share="owner">只有我能分享</button>
+            </div>
+        </label>
+    </div>
+
+    <div class="card stack">
+        <button class="btn secondary" id="btn-group-upload">上传 / 更新我的课表</button>
+        <p class="tiny upload-hint" id="group-upload-hint"></p>
+        <button class="link-btn center js-ics-help" id="btn-group-ics-help">课表怎么导出？点这里看教程</button>
+        <button class="btn danger" id="btn-group-leave">退群</button>
+        <button class="btn danger" id="btn-group-delete" hidden>解散群组</button>
+    </div>
+    <input type="file" accept=".ics,.txt" id="group-file" hidden>
+</section>
+
+<!-- ==================================================== 邀请链接管理 -->
+<section class="screen" id="screen-invites">
+    <div class="card">
+        <h2>有效邀请链接 <span class="sub" id="inv-count"></span></h2>
+        <p class="tiny" style="margin-bottom:10px">
+            可以同时发多条，每条各算各的有效期。过期或作废后新人就进不来了，
+            <b>已经在群里的人不受影响</b>。
+        </p>
+        <div class="list" id="inv-active-list"><div class="empty">还没有有效的邀请链接</div></div>
+
+        <div class="row" style="margin-top:12px" id="inv-bulk-bar" hidden>
+            <button class="btn secondary small" id="btn-inv-selectall" style="flex:1">全选</button>
+            <button class="btn danger small" id="btn-inv-revoke-selected" style="flex:1">作废选中的</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>新建邀请链接</h2>
+        <label class="field">
+            <span>有效期</span>
+            <div class="segmented" id="inv-ttl">
+                <button data-ttl="1d">1 天</button>
+                <button data-ttl="3d">3 天</button>
+                <button data-ttl="7d">7 天</button>
+                <button data-ttl="30d">1 个月</button>
+                <button data-ttl="never" class="on">永久</button>
+            </div>
+        </label>
+        <label class="field" style="margin-top:10px">
+            <span>备注名（选填，只你自己看得见）</span>
+            <input class="input" id="inv-label" maxlength="12" placeholder="比如：给 3 班的">
+        </label>
+        <button class="btn btn-ico" id="btn-inv-gen" style="margin-top:10px"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-plus"></use></svg>生成一条新链接</button>
+    </div>
+
+    <div class="card">
+        <button class="link-btn center" id="btn-inv-toggle-history">显示已失效的记录</button>
+        <div id="inv-history-box" hidden style="margin-top:10px">
+            <p class="tiny" style="margin-bottom:8px">
+                作废和过期的记录留在这里备查。删掉之后就查不到「这个码是谁发的」了。
+            </p>
+            <div class="list" id="inv-history-list"></div>
+        </div>
+    </div>
+</section>
+
+<!-- ==================================================== 账号 -->
+<section class="screen" id="screen-account">
+    <div class="card">
+        <h2>账号</h2>
+        <div class="list">
+            <div class="item">
+                <div class="grow">
+                    <div class="title" id="account-nickname">······</div>
+                    <div class="sub">昵称是全局唯一的，改不了 —— 它是别人找到你的那个名字。</div>
+                </div>
+            </div>
+            <button class="item" id="btn-change-password">
+                <div class="grow">
+                    <div class="title">修改密码</div>
+                    <div class="sub">改完之后，其他设备上的登录会全部失效。</div>
+                </div>
+                <svg class="ico chev" aria-hidden="true" focusable="false"><use href="#i-chevron-right"></use></svg>
+            </button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>危险操作</h2>
+        <p class="tiny" style="margin-bottom:12px">
+            注销之后，账号、课表、备注都会被删除，无法恢复。<br>
+            你建的群会移交给群里最早加入的成员，只有你自己的群会直接解散。
+        </p>
+        <!-- 小号红字，不是整行大红块：它是「来找才看得到」的东西，不该在这个屏里抢戏 -->
+        <button class="row-remove" id="btn-delete-account">注销账号</button>
+    </div>
+</section>
+
+<!-- ==================================================== 比对页 -->
+<section class="screen" id="screen-compare">
+    <div class="card">
+        <div class="row" style="align-items:center;margin-bottom:6px">
+            <h2 style="margin:0" id="compare-title">比对</h2>
+        </div>
+        <div class="weeks" id="compare-weeks"></div>
+        <p class="tiny week-note">调休补课、考试等日期照常显示。</p>
+        <div class="notice" id="compare-notice" hidden></div>
+        <p class="muted tiny" id="compare-stats"></p>
+    </div>
+
+    <div class="legend card" id="compare-legend">
+        <div class="legend-item"><div class="color-box" style="background:var(--c-same)"></div>同教室</div>
+        <div class="legend-item"><div class="color-box" style="background:var(--c-nearby)"></div>同楼栋</div>
+        <div class="legend-item"><div class="color-box" style="background:var(--c-area)"></div>同区域</div>
+        <div class="legend-item"><div class="color-box" style="background:var(--c-cross)"></div>不同区域</div>
+        <div class="legend-item"><div class="color-box" style="background:var(--c-unknown)"></div>未知地点</div>
+        <div class="legend-item"><div class="color-box bg-single"></div>只有一人在上</div>
+        <div class="legend-item"><div class="color-box" style="border:2px solid var(--who-me);box-shadow:0 0 0 1px var(--who-ring-me);background:var(--legend-bg)"></div>上半格：我</div>
+        <div class="legend-item"><div class="color-box" style="border:2px solid var(--who-ta);box-shadow:0 0 0 1px var(--who-ring-ta);background:var(--legend-bg)"></div>下半格：TA</div>
+    </div>
+
+    <div class="grid-wrap" id="compare-wrap">
+        <table class="schedule sticky-head" id="compare-table"></table>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+        <button class="btn btn-ico" id="btn-export"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-camera"></use></svg>保存课表截图</button>
+        <p class="tiny" style="text-align:center;margin-top:8px">
+            导出<b>全学期</b>课表（含单双周），与所选周次无关。
+        </p>
+    </div>
+</section>
+
+<!-- ==================================================== Android 下载 -->
+<section class="screen" id="screen-android-download">
+    <div class="card">
+        <div class="apk-app-head">
+            <img src="img/tongge-app-icon.svg" width="64" height="64" alt="同格 · 撞课图标">
+            <div><h2>同格 · 撞课</h2><span class="muted">最新版 · Android 8.0+</span></div>
+        </div>
+        <div class="apk-sources" aria-label="选择 APK 下载源">
+            <a class="apk-source" href="https://github.com/DongLanQwQ0/ZJU-Tongge-Schedule-Android/releases/latest/download/Tongge.apk" target="_blank" rel="noopener noreferrer"><span>GitHub 直链</span><svg class="ico" aria-hidden="true"><use href="#i-chevron-right"></use></svg></a>
+            <a class="apk-source" href="https://ghfast.top/https://github.com/DongLanQwQ0/ZJU-Tongge-Schedule-Android/releases/latest/download/Tongge.apk" target="_blank" rel="noopener noreferrer"><span>GHFast</span><svg class="ico" aria-hidden="true"><use href="#i-chevron-right"></use></svg></a>
+            <a class="apk-source" href="https://gh-proxy.com/https://github.com/DongLanQwQ0/ZJU-Tongge-Schedule-Android/releases/latest/download/Tongge.apk" target="_blank" rel="noopener noreferrer"><span>GH-Proxy</span><svg class="ico" aria-hidden="true"><use href="#i-chevron-right"></use></svg></a>
+            <a class="apk-source" href="https://ghproxy.net/https://github.com/DongLanQwQ0/ZJU-Tongge-Schedule-Android/releases/latest/download/Tongge.apk" target="_blank" rel="noopener noreferrer"><span>ghproxy.net</span><svg class="ico" aria-hidden="true"><use href="#i-chevron-right"></use></svg></a>
+        </div>
+    </div>
+    <div class="card apk-projects">
+        <h2>开源项目</h2>
+        <div class="local-entry-actions">
+            <a class="btn ghost btn-ico" href="https://github.com/DongLanQwQ0/ZJU-Tongge-Schedule-Android" target="_blank" rel="noopener noreferrer"><svg class="ico" aria-hidden="true"><use href="#i-link"></use></svg>Android 项目</a>
+            <a class="btn ghost btn-ico" href="https://github.com/DongLanQwQ0/ZJU-Tongge-Schedule" target="_blank" rel="noopener noreferrer"><svg class="ico" aria-hidden="true"><use href="#i-link"></use></svg>Web 项目</a>
+        </div>
+    </div>
+</section>
+
+<!-- ==================================================== 本地比对 -->
+<section class="screen" id="screen-local">
+    <div class="card">
+        <h2>本地快速比对 <span class="sub">不上传服务器</span></h2>
+        <div class="row" style="margin-bottom:10px">
+            <label class="drop" id="local-drop-a">
+                <div><b>我</b></div>
+                <div class="tiny">点击上传 .ics</div>
+                <span class="badge" id="local-status-a">未上传</span>
+                <input type="file" accept=".ics,.txt" data-local="a">
+            </label>
+            <label class="drop" id="local-drop-b">
+                <div><b>TA</b></div>
+                <div class="tiny">点击上传 .ics</div>
+                <span class="badge" id="local-status-b">未上传</span>
+                <input type="file" accept=".ics,.txt" data-local="b">
+            </label>
+        </div>
+        <div class="row" style="margin-bottom:10px">
+            <input class="input" id="local-name-a" maxlength="10" placeholder="我的名字（选填）">
+            <input class="input" id="local-name-b" maxlength="10" placeholder="TA 的名字（选填）">
+        </div>
+        <button class="btn btn-ico" id="btn-local-run"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-sparkles"></use></svg>生成比对课表</button>
+    </div>
+
+    <div class="legend card" id="local-legend" hidden>
+        <div class="legend-item"><div class="color-box" style="background:var(--c-same)"></div>同教室</div>
+        <div class="legend-item"><div class="color-box" style="background:var(--c-nearby)"></div>同楼栋</div>
+        <div class="legend-item"><div class="color-box" style="background:var(--c-area)"></div>同区域</div>
+        <div class="legend-item"><div class="color-box" style="background:var(--c-cross)"></div>不同区域</div>
+        <div class="legend-item"><div class="color-box" style="background:var(--c-unknown)"></div>未知地点</div>
+        <div class="legend-item"><div class="color-box bg-single"></div>只有一人在上</div>
+        <div class="legend-item"><div class="color-box" style="border:2px solid var(--who-me);box-shadow:0 0 0 1px var(--who-ring-me);background:var(--legend-bg)"></div>上半格：我</div>
+        <div class="legend-item"><div class="color-box" style="border:2px solid var(--who-ta);box-shadow:0 0 0 1px var(--who-ring-ta);background:var(--legend-bg)"></div>下半格：TA</div>
+    </div>
+    <div class="weeks" id="local-weeks" hidden></div>
+    <p class="tiny week-note" id="local-week-note" hidden>调休补课、考试等日期照常显示。</p>
+    <div class="grid-wrap" id="local-wrap" hidden>
+        <table class="schedule sticky-head" id="local-table"></table>
+    </div>
+    <div class="card" id="local-export-card" hidden style="margin-top:14px">
+        <button class="btn btn-ico" id="btn-local-export"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-camera"></use></svg>保存课表截图</button>
+    </div>
+</section>
+
+<!-- ==================================================== 页脚
+     吉祥物左右各一只（左土豆、右小猪），凑成一对。
+     整页最底下，不挡任何东西，也不抢课表的视觉 -->
+<footer class="site-foot">
+    <span class="foot-slot"><img class="foot-mascot" id="foot-mascot-left" alt="" hidden></span>
+    <div class="foot-lines">
+        <div class="foot-sign">Author: DongLanQwQ</div>
+        <div class="foot-sub"><s>Coauthor: 𝗛 𝗭 𝗥</s> <b class="foot-copig">CoPig：𝗛 ㊗️ 𝗥</b></div>
+        <div class="foot-sub foot-credit"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-server"></use></svg>鸣谢 𝗛 𝗭 𝗥 的 🥔 服务器</div>
+        <div class="foot-sub"><a class="foot-star" href="https://github.com/DongLanQwQ0/ZJU-Tongge-Schedule" target="_blank" rel="noopener noreferrer"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-star"></use></svg>觉得还行？去 GitHub 点个 Star</a></div>
+        <!-- 版本号（灰字）：内容由 app.js 从 /api/meta 取，服务端读的是
+             package.json 与构建时的提交号 —— 所以这行字说的是「此刻在跑的那一版」，
+             不是页面里写死的字符串。取不到就一直空着（默认 hidden），
+             免得留一行什么都没有的灰字。 -->
+        <div class="foot-sub foot-ver" id="foot-ver" hidden></div>
+    </div>
+    <span class="foot-slot"><img class="foot-mascot" id="foot-mascot-right" alt="" hidden></span>
+</footer>
+
+<!-- 页脚净空：背景那盏灯是**固定**在视口下方的，页脚滑到底时会正好压在灯上，
+     署名和那几行字就糊了。这里在页脚下面留一段空跑位，滚到底这一下能把署名
+     带到灯的上方。浅色主题底下没有灯，这段就不留（见 style.css 的 .foot-clearance）。 -->
+<div class="foot-clearance" aria-hidden="true"></div>
+
+</main>
+
+<!-- 内测提示：每台设备首次打开时弹一次 -->
+<div class="modal" id="beta-modal" hidden>
+    <div class="inner beta">
+        <div class="note-mark beta-mark" aria-hidden="true"><svg class="ico" focusable="false"><use href="#i-flask-conical"></use></svg></div>
+        <h2>内测中，别嫌弃呀</h2>
+        <p>
+            一个人搓的，难免有点小 bug (´･ω･`)<br>
+            有问题找 <b id="beta-owner">发起人</b>，我修得贼快～
+        </p>
+        <p>
+            唯一要认真讲的：<b>课表以教务系统为准</b>哦，别全信它～
+        </p>
+        <button class="btn" id="beta-close">好耶，去试试</button>
+    </div>
+</div>
+
+<!-- 怎么导出 .ics -->
+<div class="modal" id="ics-modal" hidden>
+    <div class="inner">
+        <h2>怎么导出 .ics 课表</h2>
+        <p class="tiny">
+            以浙大同学用的
+            <a href="https://github.com/Elyyyyyyyyxer/Elychron/releases/latest" target="_blank" rel="noopener">Elychron</a>
+            为例 —— 它是 Celechron 的社区维护版，设置页长得一样，照着下面做就行。
+        </p>
+        <ol>
+            <li>打开 App，切到「设置」</li>
+            <li>找到「日程」这一栏</li>
+            <li>点<b>「导出为 iCal 文件」</b></li>
+            <li>回到这里，选中刚导出的 .ics</li>
+        </ol>
+        <img src="img/ics-export-crop.jpg" alt="Elychron / Celechron 设置页的「日程」一栏，「导出为 iCal 文件」被蓝框标出">
+        <p class="tiny ics-links">
+            还没装？<br>
+            Elychron（社区版）
+            <a href="https://github.com/Elyyyyyyyyxer/Elychron/releases/latest" target="_blank" rel="noopener">GitHub 下载</a> ·
+            <a href="https://www.cc98.org/topic/6621773" target="_blank" rel="noopener">CC98 说明</a><br>
+            原版 Celechron
+            <a href="https://github.com/celechron/celechron/releases/latest" target="_blank" rel="noopener">GitHub 下载</a> ·
+            <a href="https://celechron.top/" target="_blank" rel="noopener">官网与安装指南</a>
+        </p>
+        <button class="btn secondary" id="ics-modal-close" style="margin-top:14px">知道了</button>
+    </div>
+</div>
+
+<!-- 二维码放大 -->
+<div class="modal" id="qr-modal" hidden>
+    <div class="inner">
+        <div class="tiny">扫码加入群组</div>
+        <div class="code" id="qr-modal-code"></div>
+        <div id="qr-modal-qr"></div>
+        <button class="btn secondary" id="qr-modal-close" style="margin-top:16px">关闭</button>
+    </div>
+</div>
+
+<div id="toast"></div>
+<div id="export-host" hidden></div>
+
+<!-- 共享纯函数模块（与 server 端、未来的小程序同一份代码）
+     ?v= 是缓存版本号：/shared/ 曾经带 24 小时 max-age，改规则后老访客仍会用旧文件
+     （max-age 的含义是「没到期就别问服务器」，改成 no-cache 也救不回已缓存的那份）。
+     换了 shared/ 下的代码就把这个数字加一。 -->
+<script src="shared/config.js?v=2"></script>
+<script src="shared/periods.js?v=2"></script>
+<script src="shared/ics.js?v=2"></script>
+<script src="shared/weeks.js?v=2"></script>
+<script src="shared/compare.js?v=2"></script>
+<script src="shared/stats.js?v=2"></script>
+<!-- 本地内置，不依赖 CDN -->
+<script src="lib/qrcode.js"></script>
+<script src="lib/html2canvas.min.js"></script>
+<script src="api.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

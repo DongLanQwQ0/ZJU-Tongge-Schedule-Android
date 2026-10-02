@@ -21,6 +21,7 @@
    **原始文件不上传**，在你浏览器里解析。
 3. **建群**：拿到邀请链接 + 二维码，发给同学。也可以同时发多条链接，每条单独设有效期。
    每个新群自带一条**永不过期的默认链接**，随时能作废或换一条。
+   创建时可选**临时群组**：从创建时算起 24 小时后自动解散，活动不会续期；邀请码随群失效，个人课表保留。
 4. **看重合**：群组页每个人都直接显示和你的重合课时数，按「同教室 / 同楼栋 / 同区域 / 不同区域」分级。
 5. **比对**：点某个人 → 双人网格图 → 「保存课表截图」导出 PNG（全学期）。
 6. **备注**：给群里的人起一个只有你看得见的名字（像微信备注名）。
@@ -35,7 +36,9 @@
 
 **同格 · 撞课** 支持 Android 8.0 及以上，提供应用内扫码、课表文件选择、截图保存和跟随系统的明暗主题，需要联网。
 
-首页「本地快速比对」卡片中的 **下载 APK** 打开下载页面，可选择 GitHub 直链、GHFast、GH-Proxy 或 ghproxy.net 下载最新正式版，也可跳转至 Android 与 Web 项目。
+Web 首页「本地快速比对」卡片中的 **下载 APK** 打开下载页面，可选择 GitHub 直链、GHFast、GH-Proxy 或 ghproxy.net 下载最新正式版，也可跳转至 Android 与 Web 项目。App 内隐藏此下载入口。
+
+Android 页面资源内置在 APK，本地比对可离线使用；登录页及菜单中的「服务器设置」可修改 HTTPS 服务器及部署路径，重启后仍保留。临时群组需部署新版服务端；旧服务端上的该选项会禁用。
 
 - [下载最新 APK](https://github.com/DongLanQwQ0/ZJU-Tongge-Schedule-Android/releases/latest/download/Tongge.apk)
 - [Android 项目](https://github.com/DongLanQwQ0/ZJU-Tongge-Schedule-Android)
@@ -115,7 +118,17 @@ PowerShell 7：`./build-apk.ps1`；依赖已缓存时可用 `./build-apk.ps1 -Of
 
 本次 Release 关闭调试，但沿用之前交付 APK 的本机签名以支持覆盖升级。签名文件不入库；后续发布必须保留同一个签名文件，换电脑时不可直接用新生成的 debug.keystore 签名并作为升级包发布。当前本机设置 `ANDROID_USER_HOME=F:\Android\user-home` 使用现有签名文件。
 
-站点入口位于 `MainActivity.HOME`，更新仓库位于 `ReleaseUpdates.REPOSITORY`。
+## APK 内置页面与服务器设置
+
+HTML、CSS、JavaScript、图片及课表纯函数模块全部随 APK 安装；只有登录、群组、课表同步等 API 请求访问服务器。登录页可直接进行本地快速比对，无需登录或连接服务器。页面资源的更新随 APK Release 发布。
+
+登录页及右上角菜单的「服务器设置」可修改完整 HTTPS 地址（域名/IP、端口、部署路径），设置在重启和升级后保留。初始地址是 `https://111.228.3.50/tongge/`；例如迁至 `https://schedule.example.com:8443/app/`，保存此地址即可。服务器须继续提供同格的 `api/*` 接口与有效 HTTPS 证书。切换服务器会退出当前登录；登录凭据按完整服务器地址隔离，邀请二维码与分享链接也使用当前地址。
+
+`EmbeddedWebsite` 使用 AndroidX `WebViewAssetLoader` 将 APK 资源映射到当前服务器同源的保留路径 `/__tongge_app__/`，API 指向配置的部署路径，因此不需要服务端额外开放 CORS。保留路径缺失资源返回本地 404，不从服务器加载网页。外部网页通过系统浏览器打开，不能使用应用内的扫一扫或服务器设置入口。
+
+网页源代码仍由[原项目](https://github.com/DongLanQwQ0/ZJU-Tongge-Schedule)维护。更新网页后运行 `./sync-web-assets.ps1 -WebProject <原项目路径>`，再构建 APK。脚本只复制 `public/` 和浏览器所需的六个 `shared/` 模块；入库的资源快照允许本仓库独立构建。
+
+默认服务器位于 `ServerAddress.DEFAULT`，更新仓库位于 `ReleaseUpdates.REPOSITORY`。迁移服务器仅需要修改用户的服务器设置；以后使用稳定域名迁移时，可保持此地址并调整 DNS。服务器变更不会影响 GitHub 新版检测。
 
 ## 发布约定
 
