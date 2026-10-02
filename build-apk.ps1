@@ -14,5 +14,6 @@ try {
     New-Item -ItemType Directory -Path 'dist' -Force | Out-Null
     $apk = "dist\Tongge-$($metadata.elements[0].versionName).apk"
     Copy-Item -LiteralPath 'app\build\outputs\apk\release\app-release.apk' -Destination $apk -Force
+    Copy-Item -LiteralPath $apk -Destination 'dist\Tongge.apk' -Force
     Write-Output "APK: $PSScriptRoot\$apk"
 } finally { Pop-Location }
