@@ -1,4 +1,4 @@
-# 同格 Android
+# 同格 · 撞课
 
 [下载最新 APK](https://github.com/DongLanQwQ0/ZJU-Tongge-Schedule-Android/releases/latest)
 
